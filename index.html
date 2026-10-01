@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Electronica B.I.B</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1 id="titulo">ELECTRONICA B.I.B</h1>
+        <p id="eslogan">Tu tienda de confianza</p>
+    </header>
+
+    <!-- Menú: lista de categorías + buscador -->
+    <nav class="clases">
+        <div class="menu-prod">
+            <button id="btnProd" aria-expanded="false" aria-controls="listaCat">Productos ▾</button>
+            <ul id="listaCat" hidden></ul>
+        </div>
+        <input id="buscador" type="search" placeholder="Buscar producto..." aria-label="Buscar producto">
+        <button id="btnCarrito" class="btn-carrito" hidden>🛒 Carrito <span id="cuentaCarrito">0</span></button>
+    </nav>
+
+    <div id="barraAdmin" class="barra-admin" hidden></div>
+    <main id="contenido"></main>
+
+    <footer>
+        <button id="btnAcceso" class="link-admin">Iniciar sesión</button>
+    </footer>
+
+    <dialog id="dlg">
+        <form id="formLogin">
+            <h2 id="dlgTitulo"></h2>
+            <input id="usuario" placeholder="Usuario" required autocomplete="username">
+            <input id="clave" type="password" placeholder="Contraseña" required autocomplete="current-password">
+            <p id="dlgError" class="error"></p>
+            <div class="fila">
+                <button type="submit" id="dlgOk">Entrar</button>
+                <button type="button" id="dlgCancelar" class="secundario">Cancelar</button>
+            </div>
+        </form>
+    </dialog>
+
+    <input type="file" id="importar" accept=".json" hidden>
+    <script src="config.js"></script>
+    <script src="carrito.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

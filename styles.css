@@ -1,0 +1,172 @@
+[hidden] { display: none !important; }
+body { margin: 0; font-family: Arial, sans-serif; background: white; color: black; }
+
+header { text-align: center; padding: 20px; background: #002b5c; box-shadow: 0 4px 10px black; }
+header h1 { margin: 0; font-size: 40px; color: white; }
+header p { color: white; }
+
+/* Menú: Productos + buscador */
+.clases { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 20px; background: #004c9b; padding: 15px; position: sticky; top: 0; z-index: 10; }
+.clases button { margin-top: 0; }
+#btnProd { background: #0066cc; color: white; font-weight: bold; padding: 10px 20px; border-radius: 12px; }
+#btnProd:hover, #btnProd[aria-expanded="true"] { background: #3396ff; }
+.menu-prod { position: relative; }
+#listaCat { position: absolute; top: calc(100% + 8px); left: 0; min-width: 220px; margin: 0; padding: 6px; list-style: none; background: white; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.4); max-height: 60vh; overflow-y: auto; }
+#listaCat button { width: 100%; text-align: left; background: none; border-radius: 8px; padding: 10px 12px; font-size: 15px; }
+#listaCat button:hover { background: #d5e6fa; }
+#listaCat button.sel { background: #004c9b; color: white; font-weight: bold; }
+#buscador { padding: 10px 16px; font-size: 16px; border: none; border-radius: 12px; width: min(320px, 90%); }
+
+main { padding: 0 20px 20px; max-width: 1100px; margin: 0 auto; }
+.titulo-vista { text-align: center; margin: 25px 0 20px; }
+.titulo-vista h2 { margin: 0 0 8px; font-size: 32px; }
+.descripcion { text-align: center; font-size: 18px; margin: 0; }
+.cuenta { color: #555; margin: 8px 0 0; }
+.vacio { text-align: center; color: #555; padding: 30px; grid-column: 1 / -1; }
+
+.grid-productos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.producto { background: #6aaaeb; padding: 15px; border-radius: 12px; text-align: center; box-shadow: 0 3px 8px black; }
+.producto img { width: 100%; height: 140px; object-fit: cover; border-radius: 10px; }
+.producto h3 { margin: 10px 0 0; }
+.producto.agotado img { filter: grayscale(1); opacity: .6; }
+.stock { font-weight: bold; margin: 4px 0 0; }
+.stock.si { color: #0a5a2a; }
+.stock.no { color: #9b1c1c; }
+
+button, .boton { margin-top: 10px; padding: 10px 15px; background: #0084ff; border: none; font-size: 16px; border-radius: 8px; cursor: pointer; display: inline-block; }
+button:hover, .boton:hover { background: #00caa0; }
+button:disabled { background: #b8c4d0; color: #555; cursor: not-allowed; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #002b5c; outline-offset: 2px; }
+.secundario { background: #d5e6fa; }
+.peligro { background: #e04848; color: white; }
+.peligro:hover { background: #b82f2f; }
+
+/* Administrador */
+.barra-admin { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 20px; background: #fff3c4; border-bottom: 2px solid #e0b800; }
+.barra-admin button { margin-top: 0; }
+.admin-tools { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 15px; }
+.admin-prod { margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(0,0,0,.25); display: flex; flex-direction: column; gap: 6px; text-align: left; }
+.admin-prod input:not([type="checkbox"]) { width: 100%; box-sizing: border-box; padding: 6px; }
+.admin-prod button, .admin-prod .boton { margin-top: 0; font-size: 14px; padding: 8px; text-align: center; }
+.check { display: flex; gap: 8px; align-items: center; font-weight: bold; }
+.nuevo-prod { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center; background: #eef5ff; border: 2px dashed #0066cc; border-radius: 12px; padding: 15px; margin-bottom: 20px; }
+.nuevo-prod h3 { flex-basis: 100%; margin: 0; text-align: center; }
+.nuevo-prod input, .nuevo-prod select { padding: 8px; }
+.nuevo-prod button { margin-top: 0; }
+
+footer { text-align: center; padding: 30px; }
+.link-admin { background: none; color: #555; text-decoration: underline; font-size: 14px; }
+.link-admin:hover { background: none; color: #002b5c; }
+
+dialog { border: none; border-radius: 15px; padding: 25px; width: min(360px, 90%); box-shadow: 0 10px 40px rgba(0,0,0,.5); }
+dialog::backdrop { background: rgba(0,0,0,.5); }
+dialog form { display: flex; flex-direction: column; gap: 12px; }
+dialog h2 { margin: 0; text-align: center; }
+dialog input { padding: 10px; font-size: 16px; }
+.fila { display: flex; gap: 10px; justify-content: center; }
+.fila button { margin-top: 0; }
+.error { color: #b82f2f; margin: 0; min-height: 1em; }
+
+@media (max-width: 900px) { .grid-productos { grid-template-columns: repeat(2, 1fr); } header h1 { font-size: 32px; } }
+@media (max-width: 600px) { .grid-productos { grid-template-columns: 1fr; } header h1 { font-size: 26px; } }
+
+/* Paginación, subcategorías y ruta */
+.paginacion { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center; margin: 30px 0; }
+.paginacion button { margin-top: 0; font-size: 15px; }
+.paginacion span { font-weight: bold; padding: 0 8px; }
+#listaCat li.sub button { padding-left: 30px; font-size: 14px; }
+.ruta { display: block; font-size: 12px; color: #0b2a4d; margin-top: 8px; }
+.admin-prod select { width: 100%; padding: 6px; box-sizing: border-box; }
+
+/* Opciones (colores/talles), visor de imagen, guardado */
+.producto img { cursor: zoom-in; }
+.opciones { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 8px; }
+.chip { margin: 0; padding: 6px 12px; font-size: 14px; background: #d5e6fa; border: 2px solid transparent; }
+.chip.sel { background: white; border-color: #002b5c; font-weight: bold; }
+.chip.tachada { text-decoration: line-through; opacity: .6; }
+.admin-var { background: rgba(255,255,255,.55); border-radius: 8px; padding: 8px; }
+.admin-var summary { cursor: pointer; font-weight: bold; }
+.var-fila, .nueva-var { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; padding-top: 8px; border-top: 1px dashed rgba(0,0,0,.3); }
+.nueva-var small { color: #333; }
+.estado { flex-basis: 100%; font-size: 14px; }
+.sin-guardar { margin-left: 10px; padding: 2px 8px; background: #e04848; color: white; border-radius: 6px; font-weight: bold; }
+#visor { border: none; background: transparent; padding: 0; max-width: 95vw; max-height: 95vh; overflow: visible; }
+#visor::backdrop { background: rgba(0,0,0,.85); }
+#visor img { display: block; max-width: 90vw; max-height: 82vh; border-radius: 12px; background: white; cursor: zoom-out; }
+#visor button { display: block; margin: 12px auto 0; }
+#aviso { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #002b5c; color: white; padding: 12px 20px; border-radius: 10px; z-index: 50; }
+
+/* Carrito y pedidos */
+.btn-carrito { background: #0066cc; color: white; font-weight: bold; padding: 10px 20px; border-radius: 12px; }
+.btn-carrito span { background: #00caa0; color: #002b5c; border-radius: 10px; padding: 2px 8px; margin-left: 6px; }
+#dlgCarrito { width: min(640px, 95%); max-height: 90vh; overflow-y: auto; }
+#dlgCarrito h2, #dlgCant h2 { margin-top: 0; text-align: center; }
+.fila-carrito { display: grid; grid-template-columns: 1fr auto auto; gap: 8px 14px; align-items: center; padding: 12px 0; border-bottom: 1px solid #ddd; }
+.cantidad { display: flex; align-items: center; gap: 8px; }
+.cantidad button { margin: 0; padding: 4px 12px; }
+.cantidad.grande { justify-content: center; }
+.cantidad input { width: 70px; text-align: center; }
+.subtotal { text-align: right; font-weight: bold; }
+.subtotal button { margin-top: 6px; font-size: 13px; padding: 4px 10px; }
+.total-carrito { text-align: right; font-size: 22px; font-weight: bold; margin: 16px 0; }
+.pago { background: #eef5ff; border: 2px solid #0066cc; border-radius: 12px; padding: 12px 16px; margin: 14px 0; }
+.pago p { margin: 8px 0; }
+.pago a { color: #003f8a; font-weight: bold; word-break: break-all; }
+#dlgCarrito .fila { flex-wrap: wrap; }
+
+/* ===== Animación al pasar el mouse por un producto ===== */
+.producto { position: relative; transition: transform 0.25s ease, box-shadow 0.25s ease; }
+@media (hover: hover) {
+    .producto:hover { transform: scale(1.04); box-shadow: 0 8px 18px rgba(0, 0, 0, 0.55); z-index: 2; }
+    .producto:has(.admin-prod):hover { transform: none; }   /* sin zoom mientras el admin edita */
+}
+@media (prefers-reduced-motion: reduce) {
+    .producto { transition: none; }
+    .producto:hover { transform: none; }
+}
+
+/* ===== Adaptación a pantallas ===== */
+img { max-width: 100%; }
+
+/* 1) Tablet: hasta 900px (2 columnas) */
+@media (max-width: 900px) {
+    main { padding: 0 16px 20px; }
+    .clases { gap: 14px; }
+    .titulo-vista h2 { font-size: 28px; }
+}
+
+/* 2) Celular tipo Samsung A52 (412px): 2 columnas compactas */
+@media (max-width: 600px) {
+    header { padding: 14px; }
+    header h1 { font-size: 24px; }
+    .clases { justify-content: space-between; gap: 10px; padding: 10px 12px; }
+    .menu-prod { order: 1; }
+    .btn-carrito { order: 2; }
+    #buscador { order: 3; flex: 1 1 100%; width: 100%; box-sizing: border-box; }
+    main { padding: 0 12px 20px; }
+    .titulo-vista h2 { font-size: 24px; }
+    .descripcion { font-size: 16px; }
+    .grid-productos { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .producto { padding: 10px; }
+    .producto img { height: 110px; }
+    .producto h3 { font-size: 15px; }
+    .producto p { font-size: 14px; margin: 6px 0; }
+    .producto > button { padding: 8px 12px; font-size: 14px; }
+    .chip { padding: 5px 10px; font-size: 13px; }
+    .paginacion { gap: 6px; }
+    .paginacion button { padding: 8px 10px; font-size: 14px; }
+    .barra-admin { padding: 10px 12px; }
+    .barra-admin button { font-size: 14px; padding: 8px 10px; }
+    .nuevo-prod > :not(h3) { flex: 1 1 100%; }
+    dialog { padding: 16px; }
+    .fila-carrito { grid-template-columns: 1fr auto; }
+    .subtotal { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; text-align: left; }
+    .total-carrito { font-size: 20px; }
+}
+
+/* 3) Celulares chicos: hasta 360px (1 columna) */
+@media (max-width: 360px) {
+    .grid-productos { grid-template-columns: 1fr; }
+    .producto img { height: 160px; }
+    header h1 { font-size: 21px; }
+}
