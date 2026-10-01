@@ -6,7 +6,7 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 const precio = (n) => '$' + Number(n).toLocaleString('es-AR');
 const norm = (s) => String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 const fmt = (t) => (t ? new Date(Number(t)).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : '—');
-// ADMIN_USUARIO y ADMIN_CLAVE están en config.js
+// Usuario y clave del administrador se validan en el servidor (Netlify)
 
 const mk = (carpeta, letra, precios) =>
     precios.map((p, i) => ({ id: letra + (i + 1), nombre: '', foto: `${carpeta}/${i + 1}${letra}.jpg`, precio: p, stock: true, variantes: [] }));
@@ -20,8 +20,11 @@ let datos = JSON.parse(localStorage.getItem(KEY) || 'null') || structuredClone(I
 const TXT_BASE = { titulo: 'ELECTRONICA B.I.B', eslogan: 'Tu tienda de confianza', pedidos: true, alias: '', telefono: '', gmail: '' };
 const conBase = (t) => ({ ...TXT_BASE, ...t });
 let textos = conBase(JSON.parse(localStorage.getItem(KEY_TXT) || 'null'));
-function guardarTextos() { localStorage.setItem(KEY_TXT, JSON.stringify(textos)); localStorage.setItem(KEY_CAMBIO, Date.now()); render(); }
+function guardarTextos() { localStorage.setItem(KEY_TXT, JSON.stringify(textos)); localStorage.setItem(KEY_CAMBIO, Date.now()); sincronizar(); render(); }
 let esAdmin = sessionStorage.getItem(KEY_SESION) === '1';
+const KEY_AUTH = 'tienda_auth';
+let servidorVacio = false, temporizadorEnvio = null;
+const credenciales = () => JSON.parse(sessionStorage.getItem(KEY_AUTH) || 'null');
 let vista = 'todo', pagina = 1, busqueda = '';
 const sel = {};               // opción elegida por producto
 const abiertos = new Set();   // paneles de opciones abiertos (admin)
@@ -35,7 +38,8 @@ function avisar(t) { $('aviso').textContent = t; $('aviso').hidden = false; clea
 
 function guardar() {
     try { localStorage.setItem(KEY, JSON.stringify(datos)); localStorage.setItem(KEY_CAMBIO, Date.now()); }
-    catch { alert('No hay espacio para guardar. Probá con fotos más chicas o borrá productos.'); }
+    catch { if (!credenciales()) alert('No hay espacio para guardar. Probá con fotos más chicas o borrá productos.'); }
+    sincronizar();
     render();
 }
 
@@ -57,6 +61,34 @@ function leerImagen(archivo) {
         lector.onerror = fallo;
         lector.readAsDataURL(archivo);
     });
+}
+
+/* ============ CATÁLOGO COMPARTIDO (servidor) ============ */
+// El admin publica sus cambios en el servidor; todos los demás dispositivos los leen al abrir la página.
+function sincronizar() {
+    const cred = credenciales();
+    if (!esAdmin || !cred) return;
+    clearTimeout(temporizadorEnvio);
+    temporizadorEnvio = setTimeout(async () => {
+        try {
+            const r = await fetch('/api/tienda', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...cred, tienda: { textos, categorias: datos } }) });
+            if (!r.ok) throw new Error(r.status);
+            avisar('Cambios publicados para todos ✔');
+        } catch { avisar('⚠ No se pudo publicar en el servidor'); }
+    }, 600);
+}
+async function cargarDelServidor() {
+    try {
+        const r = await fetch('/api/tienda', { cache: 'no-store' });
+        if (r.status === 404) { servidorVacio = true; return; }
+        if (!r.ok) return;
+        const t = await r.json();
+        if (!Array.isArray(t.categorias)) return;
+        datos = t.categorias; textos = conBase(t.textos);
+        try { localStorage.setItem(KEY, JSON.stringify(datos)); localStorage.setItem(KEY_TXT, JSON.stringify(textos)); } catch { /* sin espacio: no importa */ }
+        render();
+    } catch { /* sin servidor: se usa lo guardado en este navegador */ }
 }
 
 /* ============ DIBUJAR LA PÁGINA ============ */
@@ -253,7 +285,7 @@ const acciones = {
         if (t.trim()) textos.titulo = t.trim();
         if (e !== null) textos.eslogan = e.trim();
         localStorage.setItem(KEY_TXT, JSON.stringify(textos)); localStorage.setItem(KEY_CAMBIO, Date.now());
-        render();
+        sincronizar(); render();
     },
     nuevaCat() {
         const nombre = prompt('Nombre de la categoría (ej: ROPA):');
@@ -314,7 +346,7 @@ const acciones = {
         a.download = 'copia-tienda.json'; a.click();
     },
     importar() { $('importar').click(); },
-    salir() { esAdmin = false; sessionStorage.removeItem(KEY_SESION); render(); },
+    salir() { esAdmin = false; sessionStorage.removeItem(KEY_SESION); sessionStorage.removeItem(KEY_AUTH); render(); },
 };
 
 document.addEventListener('click', (e) => {
@@ -353,15 +385,18 @@ $('btnAcceso').addEventListener('click', () => {
     $('dlg').showModal();
 });
 $('dlgCancelar').addEventListener('click', () => $('dlg').close());
-$('formLogin').addEventListener('submit', (e) => {
+$('formLogin').addEventListener('submit', async (e) => {
     e.preventDefault();
-    if ($('usuario').value.trim().toUpperCase() !== ADMIN_USUARIO.toUpperCase() || $('clave').value !== ADMIN_CLAVE) {
-        $('dlgError').textContent = 'Usuario o contraseña incorrectos.';
-        return;
-    }
-    esAdmin = true; sessionStorage.setItem(KEY_SESION, '1');
+    const cred = { usuario: $('usuario').value.trim(), clave: $('clave').value };
+    try {
+        const r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cred) });
+        if (!r.ok) { $('dlgError').textContent = 'Usuario o contraseña incorrectos.'; return; }
+    } catch { $('dlgError').textContent = 'No se pudo conectar con el servidor.'; return; }
+    esAdmin = true; sessionStorage.setItem(KEY_SESION, '1'); sessionStorage.setItem(KEY_AUTH, JSON.stringify(cred));
     $('dlg').close(); render();
+    if (servidorVacio) { servidorVacio = false; sincronizar(); }   // primera vez: publica lo que hay
 });
 
 iniciarCarrito();
 render();
+cargarDelServidor();

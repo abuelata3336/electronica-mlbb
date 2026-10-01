@@ -1,6 +1,6 @@
 /* ====== CARRITO DE INVITADO + PEDIDOS (se carga antes de app.js) ====== */
 const KEY_CARRITO = 'tienda_carrito', MAX_CANT = 99;
-const API = typeof API_PEDIDOS !== 'undefined' ? API_PEDIDOS : 'http://localhost:3000/api/pedidos';
+const API = typeof API_PEDIDOS !== 'undefined' ? API_PEDIDOS : '/api/pedidos';
 let pendiente = null, pedidoHecho = null;
 
 /* ---- Carrito guardado en el navegador del invitado ---- */
@@ -100,7 +100,7 @@ const accionesCarrito = {
         try {
             const r = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(pedidoHecho) });
             if (!r.ok) throw new Error(r.status);
-        } catch { console.warn('El pedido no llegó al servidor (¿está corriendo server.js?).'); }
+        } catch { console.warn('El pedido no llegó al servidor.'); }
     },
     /* Panel de administrador */
     togglePedidos() { textos.pedidos = !textos.pedidos; guardarTextos(); },
