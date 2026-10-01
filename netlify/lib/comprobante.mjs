@@ -1,6 +1,6 @@
 // Genera el PDF del comprobante. paraNegocio=true agrega los datos del cliente (nombre, teléfono, dirección).
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
-import { PAGOS } from "./pedido.mjs";
+import { PAGOS, ENTREGAS } from "./pedido.mjs";
 
 // Las fuentes estándar del PDF solo admiten Latin-1: se reemplaza o descarta lo demás
 const limpiar = (s) => String(s ?? "").replace(/[–—]/g, "-").replace(/[“”]/g, '"').replace(/[‘’]/g, "'")
@@ -45,23 +45,30 @@ export async function generarComprobante(pedido, { tienda = "Tienda", alias = ""
     texto(paraNegocio ? "NUEVO PEDIDO - copia para el negocio" : "Comprobante de pedido", M, H - 60, { tam: 12, color: rgb(1, 1, 1) });
     y = H - 110;
 
-    texto("Pedido:", M, y, { f: negrita }); texto(pedido.id, M + 50, y);
-    texto("Fecha:", 300, y, { f: negrita }); texto(fechaAR(pedido.fecha), 340, y);
-    y -= 18;
-    texto("Pago:", M, y, { f: negrita });
-    texto(PAGOS[pedido.pago] + (pedido.pago === "mercadopago" && alias ? ` - Alias: ${alias}` : ""), M + 50, y);
-    y -= 26;
+    // Fila "Etiqueta: valor" con el valor ajustado a varias líneas si es largo
+    const campo = (etiqueta, valor) => {
+        texto(etiqueta, M, y, { f: negrita });
+        const lineas = envolver(valor, W - M - (M + 125), normal, 10);
+        lineas.forEach((l, k) => texto(l, M + 125, y - k * 13));
+        y -= 15 + Math.max(0, lineas.length - 1) * 13;
+    };
+    // Entrega: lo que se imprime depende de lo que eligió el cliente
+    const e = pedido.entrega || { tipo: "domicilio", direccion: (pedido.cliente && pedido.cliente.direccion) || "" };
+    campo("Pedido:", pedido.id);
+    campo("Fecha:", fechaAR(pedido.fecha));
+    campo("Pago:", PAGOS[pedido.pago] + (pedido.pago === "mercadopago" && alias ? ` - Alias: ${alias}` : ""));
+    campo("Tipo de entrega:", ENTREGAS[e.tipo]);
+    if (e.tipo === "retiro") campo("Sucursal elegida:", `${e.sucursal.nombre} - ${e.sucursal.direccion}`);
+    else campo("Dirección de destino:", e.direccion);
+    y -= 12;
 
     if (paraNegocio) {
         const c = pedido.cliente;
-        pagina.drawRectangle({ x: M, y: y - 62, width: W - 2 * M, height: 78, borderColor: AZUL, borderWidth: 1.2, color: rgb(0.95, 0.97, 1) });
+        pagina.drawRectangle({ x: M, y: y - 36, width: W - 2 * M, height: 52, borderColor: AZUL, borderWidth: 1.2, color: rgb(0.95, 0.97, 1) });
         texto("DATOS DEL CLIENTE", M + 10, y, { f: negrita, color: AZUL }); y -= 17;
-        texto("Nombre y apellido:", M + 10, y, { f: negrita }); texto(c.nombre, M + 115, y); y -= 15;
-        texto("Teléfono:", M + 10, y, { f: negrita }); texto(c.telefono, M + 115, y); y -= 15;
-        texto("Dirección:", M + 10, y, { f: negrita });
-        const lineas = envolver(c.direccion, W - 2 * M - 125, normal, 10);
-        lineas.forEach((l, k) => texto(l, M + 115, y - k * 13));
-        y -= 36 + Math.max(0, lineas.length - 1) * 13;
+        texto("Nombre y apellido:", M + 10, y, { f: negrita }); texto(c.nombre, M + 125, y); y -= 15;
+        texto("Teléfono:", M + 10, y, { f: negrita }); texto(c.telefono, M + 125, y);
+        y -= 36;
     }
 
     encabezadoTabla();

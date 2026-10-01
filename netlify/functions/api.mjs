@@ -9,7 +9,7 @@
 //   GMAIL_USER, GMAIL_APP_PASSWORD        -> cuenta Gmail que ENVÍA los correos (con "contraseña de aplicación")
 import { getStore } from "@netlify/blobs";
 import nodemailer from "nodemailer";
-import { armarPedido, PAGOS } from "../lib/pedido.mjs";
+import { armarPedido, PAGOS, ENTREGAS } from "../lib/pedido.mjs";
 import { generarComprobante } from "../lib/comprobante.mjs";
 
 const json = (obj, status = 200) =>
@@ -27,13 +27,14 @@ async function avisarAlNegocio(pedido, pdf, destino) {
     const usuario = process.env.GMAIL_USER, clave = process.env.GMAIL_APP_PASSWORD;
     if (!usuario || !clave || !(destino || usuario)) { console.error("Falta GMAIL_USER o GMAIL_APP_PASSWORD: no se envió el correo del pedido", pedido.id); return false; }
     try {
-        const c = pedido.cliente;
+        const c = pedido.cliente, e = pedido.entrega;
+        const destinoTexto = e.tipo === "retiro" ? `Sucursal elegida: ${e.sucursal.nombre} - ${e.sucursal.direccion}` : `Dirección de destino: ${e.direccion}`;
         const correo = nodemailer.createTransport({ service: "gmail", auth: { user: usuario, pass: clave.replace(/\s/g, "") } });
         await correo.sendMail({
             from: `"Pedidos de la tienda" <${usuario}>`,
             to: destino || usuario,
-            subject: `Nuevo pedido ${pedido.id} - ${c.nombre} - ${dinero(pedido.total)}`,
-            text: `Nuevo pedido ${pedido.id}\n\nCliente: ${c.nombre}\nTeléfono: ${c.telefono}\nDirección: ${c.direccion}\nPago: ${PAGOS[pedido.pago]}\n\n` +
+            subject: `Nuevo pedido ${pedido.id} (${e.tipo === "retiro" ? "RETIRO" : "ENVÍO"}) - ${c.nombre} - ${dinero(pedido.total)}`,
+            text: `Nuevo pedido ${pedido.id}\n\nCliente: ${c.nombre}\nTeléfono: ${c.telefono}\nEntrega: ${ENTREGAS[pedido.entrega.tipo]}\n${destinoTexto}\nPago: ${PAGOS[pedido.pago]}\n\n` +
                 pedido.items.map((i) => `- ${i.cantidad} x ${i.producto} = ${dinero(i.subtotal)}`).join("\n") + `\n\nTotal: ${dinero(pedido.total)}\n\nEl comprobante está adjunto en PDF.`,
             attachments: [{ filename: `pedido-${pedido.id}.pdf`, content: Buffer.from(pdf), contentType: "application/pdf" }],
         });
@@ -79,7 +80,7 @@ export default async (req) => {
             generarComprobante(pedido, { ...opciones, paraNegocio: true }),
         ]);
         const [, correo] = await Promise.all([getStore("pedidos").setJSON(pedido.id, pedido), avisarAlNegocio(pedido, pdfNegocio, destino)]);
-        return json({ ok: true, id: pedido.id, total: pedido.total, items: pedido.items, pago: pedido.pago, correo, pdf: Buffer.from(pdfCliente).toString("base64") }, 201);
+        return json({ ok: true, id: pedido.id, total: pedido.total, items: pedido.items, pago: pedido.pago, entrega: pedido.entrega, correo, pdf: Buffer.from(pdfCliente).toString("base64") }, 201);
     }
 
     if (ruta === "/api/admin" && req.method === "POST") {

@@ -1,5 +1,6 @@
 // Validación del pedido. El servidor NO confía en precios ni nombres que manda el navegador:
 // los toma del catálogo publicado (y revisa el stock).
+export const ENTREGAS = { domicilio: "Envío a Domicilio", retiro: "Retiro en Sucursal" };
 export const PAGOS = { mercadopago: "Transferencia por Mercado Pago", efectivo: "Efectivo (abona al recibir)" };
 const txt = (v, max) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 
@@ -7,9 +8,23 @@ export function armarPedido(o, catalogo) {
     const err = (error, codigo = 400) => ({ error, codigo });
     if (!o || typeof o.id !== "string" || !/^[A-Za-z0-9-]{3,40}$/.test(o.id)) return err("Pedido inválido.");
     const cl = o.cliente || {};
-    const cliente = { nombre: txt(cl.nombre, 80), telefono: txt(cl.telefono, 30), direccion: txt(cl.direccion, 200) };
-    if (!cliente.nombre || !cliente.direccion) return err("Completá nombre y apellido, y dirección.");
+    const cliente = { nombre: txt(cl.nombre, 80), telefono: txt(cl.telefono, 30) };
+    if (!cliente.nombre) return err("Completá nombre y apellido.");
     if (cliente.telefono.replace(/\D/g, "").length < 6) return err("Ingresá un teléfono válido.");
+
+    // Entrega: envío a domicilio (requiere dirección) o retiro en una sucursal que exista en la lista del administrador
+    const en = o.entrega || {};
+    let entrega;
+    if (en.tipo === "retiro") {
+        const lista = catalogo && catalogo.textos && catalogo.textos.sucursales;
+        const suc = Array.isArray(lista) && lista.find((x) => x && x.id === en.sucursalId);
+        if (!suc) return err("Elegí una sucursal de la lista (puede que ya no esté disponible).", 409);
+        entrega = { tipo: "retiro", sucursal: { id: suc.id, nombre: txt(suc.nombre, 80), direccion: txt(suc.direccion, 200) } };
+    } else {   // sin "entrega" (página vieja en caché) se toma como domicilio con la dirección del cliente
+        const direccion = txt(en.direccion ?? cl.direccion, 200);
+        if (direccion.length < 5) return err("Ingresá la dirección de entrega.");
+        entrega = { tipo: "domicilio", direccion };
+    }
     if (!PAGOS[o.pago]) return err("Elegí un método de pago.");
     if (!Array.isArray(o.items) || !o.items.length || o.items.length > 50) return err("El carrito está vacío o es demasiado grande.");
 
@@ -33,5 +48,5 @@ export function armarPedido(o, catalogo) {
         if (!producto || !Number.isFinite(precioUnitario) || precioUnitario < 0) return err("Producto inválido.");
         items.push({ producto: txt(producto, 120), precioUnitario, cantidad, subtotal: precioUnitario * cantidad });
     }
-    return { pedido: { id: o.id, fecha: new Date().toISOString(), cliente, pago: o.pago, items, total: items.reduce((s, i) => s + i.subtotal, 0) } };
+    return { pedido: { id: o.id, fecha: new Date().toISOString(), cliente, entrega, pago: o.pago, items, total: items.reduce((s, i) => s + i.subtotal, 0) } };
 }
