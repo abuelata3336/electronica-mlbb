@@ -2,9 +2,15 @@
 //   GET  /api/tienda  -> catálogo compartido (público)
 //   PUT  /api/tienda  -> guarda el catálogo (solo administrador)
 //   POST /api/login   -> verifica usuario y clave
-//   POST /api/pedidos -> guarda un pedido
-// Usuario y clave se definen en Netlify > Variables ambientales: ADMIN_USUARIO y ADMIN_CLAVE
+//   POST /api/pedidos -> valida el pedido, genera el PDF, lo envía por correo al negocio y lo devuelve al cliente
+//   POST /api/admin   -> (solo administrador) lee o cambia el correo que recibe los pedidos
+// Variables ambientales en Netlify:
+//   ADMIN_USUARIO, ADMIN_CLAVE            -> acceso del administrador
+//   GMAIL_USER, GMAIL_APP_PASSWORD        -> cuenta Gmail que ENVÍA los correos (con "contraseña de aplicación")
 import { getStore } from "@netlify/blobs";
+import nodemailer from "nodemailer";
+import { armarPedido, PAGOS } from "../lib/pedido.mjs";
+import { generarComprobante } from "../lib/comprobante.mjs";
 
 const json = (obj, status = 200) =>
     new Response(JSON.stringify(obj), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
@@ -14,16 +20,25 @@ const esAdmin = (o) => {
     return !!u && !!c && !!o && String(o.usuario || "").trim().toUpperCase() === u.trim().toUpperCase() && o.clave === c;
 };
 
-// Revisa el pedido y recalcula subtotales y total (no confía en los que manda el navegador)
-function validarPedido(o) {
-    if (!o || typeof o.id !== "string" || !Array.isArray(o.items) || !o.items.length || o.items.length > 200) return null;
-    const items = [];
-    for (const i of o.items) {
-        const cantidad = Number(i.cantidad), precioUnitario = Number(i.precioUnitario);
-        if (!Number.isInteger(cantidad) || cantidad < 1 || cantidad > 99 || !(precioUnitario >= 0) || typeof i.producto !== "string") return null;
-        items.push({ producto: i.producto.slice(0, 120), precioUnitario, cantidad, subtotal: precioUnitario * cantidad });
-    }
-    return { id: o.id.slice(0, 40), fecha: new Date().toISOString(), items, total: items.reduce((s, i) => s + i.subtotal, 0) };
+const dinero = (n) => "$" + Number(n).toLocaleString("es-AR");
+
+// Envía el PDF (con los datos del cliente) al correo del negocio. Devuelve true si salió bien.
+async function avisarAlNegocio(pedido, pdf, destino) {
+    const usuario = process.env.GMAIL_USER, clave = process.env.GMAIL_APP_PASSWORD;
+    if (!usuario || !clave || !(destino || usuario)) { console.error("Falta GMAIL_USER o GMAIL_APP_PASSWORD: no se envió el correo del pedido", pedido.id); return false; }
+    try {
+        const c = pedido.cliente;
+        const correo = nodemailer.createTransport({ service: "gmail", auth: { user: usuario, pass: clave.replace(/\s/g, "") } });
+        await correo.sendMail({
+            from: `"Pedidos de la tienda" <${usuario}>`,
+            to: destino || usuario,
+            subject: `Nuevo pedido ${pedido.id} - ${c.nombre} - ${dinero(pedido.total)}`,
+            text: `Nuevo pedido ${pedido.id}\n\nCliente: ${c.nombre}\nTeléfono: ${c.telefono}\nDirección: ${c.direccion}\nPago: ${PAGOS[pedido.pago]}\n\n` +
+                pedido.items.map((i) => `- ${i.cantidad} x ${i.producto} = ${dinero(i.subtotal)}`).join("\n") + `\n\nTotal: ${dinero(pedido.total)}\n\nEl comprobante está adjunto en PDF.`,
+            attachments: [{ filename: `pedido-${pedido.id}.pdf`, content: Buffer.from(pdf), contentType: "application/pdf" }],
+        });
+        return true;
+    } catch (e) { console.error("No se pudo enviar el correo del pedido", pedido.id, e.message); return false; }
 }
 
 export default async (req) => {
@@ -52,13 +67,35 @@ export default async (req) => {
     }
 
     if (ruta === "/api/pedidos" && req.method === "POST") {
-        const pedido = validarPedido(cuerpo);
-        if (!pedido) return json({ ok: false, error: "Pedido inválido" }, 400);
-        await getStore("pedidos").setJSON(pedido.id.replace(/[^A-Za-z0-9-]/g, ""), pedido);
-        return json({ ok: true, id: pedido.id }, 201);
+        const catalogo = await tienda.get("catalogo", { type: "json" });
+        const r = armarPedido(cuerpo, catalogo);
+        if (r.error) return json({ ok: false, error: r.error }, r.codigo);
+        const { pedido } = r;
+        const opciones = { tienda: (catalogo && catalogo.textos && catalogo.textos.titulo) || "Tienda", alias: (catalogo && catalogo.textos && catalogo.textos.alias) || "" };
+        const destino = await getStore({ name: "config", consistency: "strong" }).get("correo");
+        // PDF para el cliente y PDF para el negocio (con sus datos); guardado y correo en paralelo
+        const [pdfCliente, pdfNegocio] = await Promise.all([
+            generarComprobante(pedido, { ...opciones, paraNegocio: false }),
+            generarComprobante(pedido, { ...opciones, paraNegocio: true }),
+        ]);
+        const [, correo] = await Promise.all([getStore("pedidos").setJSON(pedido.id, pedido), avisarAlNegocio(pedido, pdfNegocio, destino)]);
+        return json({ ok: true, id: pedido.id, total: pedido.total, items: pedido.items, pago: pedido.pago, correo, pdf: Buffer.from(pdfCliente).toString("base64") }, 201);
+    }
+
+    if (ruta === "/api/admin" && req.method === "POST") {
+        if (!esAdmin(cuerpo)) return json({ ok: false, error: "No autorizado" }, 401);
+        const config = getStore({ name: "config", consistency: "strong" });
+        if (cuerpo.accion === "leerCorreo") return json({ ok: true, correo: (await config.get("correo")) || "" });
+        if (cuerpo.accion === "guardarCorreo") {
+            const c = String(cuerpo.correo || "").trim().toLowerCase();
+            if (c && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c)) return json({ ok: false, error: "Correo inválido" }, 400);
+            if (c) await config.set("correo", c); else await config.delete("correo");
+            return json({ ok: true });
+        }
+        return json({ ok: false, error: "Acción desconocida" }, 400);
     }
 
     return json({ ok: false }, 405);
 };
 
-export const config = { path: ["/api/tienda", "/api/login", "/api/pedidos"] };
+export const config = { path: ["/api/tienda", "/api/login", "/api/pedidos", "/api/admin"] };
