@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Electronica B.I.B</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=4">
 </head>
 <body>
     <header>
@@ -19,6 +19,13 @@
             <ul id="listaCat" hidden></ul>
         </div>
         <input id="buscador" type="search" placeholder="Buscar producto..." aria-label="Buscar producto">
+        <select id="orden" aria-label="Ordenar productos">
+            <option value="">Ordenar por…</option>
+            <option value="precio-asc">Precio: menor a mayor</option>
+            <option value="precio-desc">Precio: mayor a menor</option>
+            <option value="az">Alfabético: A a Z</option>
+            <option value="za">Alfabético inverso: Z a A</option>
+        </select>
         <button id="btnCarrito" class="btn-carrito" hidden>🛒 Carrito <span id="cuentaCarrito">0</span></button>
     </nav>
 
@@ -43,6 +50,7 @@
     </dialog>
 
     <input type="file" id="importar" accept=".json" hidden>
+
     <script src="config.js"></script>
     <script src="carrito.js"></script>
     <script src="app.js"></script>

@@ -25,7 +25,7 @@ let esAdmin = sessionStorage.getItem(KEY_SESION) === '1';
 const KEY_AUTH = 'tienda_auth';
 let servidorVacio = false, temporizadorEnvio = null;
 const credenciales = () => JSON.parse(sessionStorage.getItem(KEY_AUTH) || 'null');
-let vista = 'todo', pagina = 1, busqueda = '';
+let vista = 'todo', pagina = 1, busqueda = '', orden = '';
 const sel = {};               // opción elegida por producto
 const abiertos = new Set();   // paneles de opciones abiertos (admin)
 
@@ -167,6 +167,14 @@ function renderContenido() {
             if (!q || norm(`${p.nombre} ${c.nombre} ${extra}`).includes(q)) lista.push([c, p]);
         });
     });
+    const nombreDe = ([c, p]) => norm(p.nombre || c.nombre);
+    const criterios = {
+        'precio-asc': (x, y) => x[1].precio - y[1].precio,
+        'precio-desc': (x, y) => y[1].precio - x[1].precio,
+        'az': (x, y) => nombreDe(x).localeCompare(nombreDe(y), 'es'),
+        'za': (x, y) => nombreDe(y).localeCompare(nombreDe(x), 'es'),
+    };
+    if (criterios[orden]) lista.sort(criterios[orden]);
     const paginas = Math.max(1, Math.ceil(lista.length / POR_PAGINA));
     pagina = Math.min(Math.max(1, pagina), paginas);
     const visibles = lista.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA);
@@ -198,6 +206,7 @@ function renderBarra() {
         <button data-a="editarTextos">Editar título y eslogan</button>
         <button data-a="togglePedidos" class="${textos.pedidos ? '' : 'secundario'}">Pedidos: ${textos.pedidos ? 'ACTIVADO' : 'DESACTIVADO'}</button>
         <button data-a="editarCobro">Datos de cobro</button>
+        <button data-a="editarCorreoPedidos">Correo de pedidos (privado)</button>
         <button data-a="nuevaCat">+ Nueva categoría</button>
         <button data-a="exportar" class="secundario">Descargar copia</button>
         <button data-a="importar" class="secundario">Restaurar copia</button>
@@ -227,6 +236,7 @@ $('btnProd').addEventListener('click', () => {
     $('listaCat').hidden = !abrir;
     $('btnProd').setAttribute('aria-expanded', String(abrir));
 });
+$('orden').addEventListener('change', (e) => { orden = e.target.value; pagina = 1; renderContenido(); });
 $('buscador').addEventListener('input', (e) => { busqueda = e.target.value; pagina = 1; renderContenido(); });
 $('visor').addEventListener('click', () => $('visor').close());
 document.addEventListener('click', (e) => {
@@ -390,7 +400,8 @@ $('formLogin').addEventListener('submit', async (e) => {
     const cred = { usuario: $('usuario').value.trim(), clave: $('clave').value };
     try {
         const r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cred) });
-        if (!r.ok) { $('dlgError').textContent = 'Usuario o contraseña incorrectos.'; return; }
+        if (r.status === 401) { $('dlgError').textContent = 'Usuario o contraseña incorrectos.'; return; }
+        if (!r.ok) { $('dlgError').textContent = `El servidor no está respondiendo bien (error ${r.status}). Revisá la función y las variables en Netlify.`; return; }
     } catch { $('dlgError').textContent = 'No se pudo conectar con el servidor.'; return; }
     esAdmin = true; sessionStorage.setItem(KEY_SESION, '1'); sessionStorage.setItem(KEY_AUTH, JSON.stringify(cred));
     $('dlg').close(); render();

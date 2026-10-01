@@ -15,7 +15,7 @@ header p { color: white; }
 #listaCat button { width: 100%; text-align: left; background: none; border-radius: 8px; padding: 10px 12px; font-size: 15px; }
 #listaCat button:hover { background: #d5e6fa; }
 #listaCat button.sel { background: #004c9b; color: white; font-weight: bold; }
-#buscador { padding: 10px 16px; font-size: 16px; border: none; border-radius: 12px; width: min(320px, 90%); }
+#buscador, #orden { padding: 10px 16px; font-size: 16px; border: none; border-radius: 12px; width: min(320px, 90%); }
 
 main { padding: 0 20px 20px; max-width: 1100px; margin: 0 auto; }
 .titulo-vista { text-align: center; margin: 25px 0 20px; }
@@ -67,9 +67,6 @@ dialog input { padding: 10px; font-size: 16px; }
 .fila button { margin-top: 0; }
 .error { color: #b82f2f; margin: 0; min-height: 1em; }
 
-@media (max-width: 900px) { .grid-productos { grid-template-columns: repeat(2, 1fr); } header h1 { font-size: 32px; } }
-@media (max-width: 600px) { .grid-productos { grid-template-columns: 1fr; } header h1 { font-size: 26px; } }
-
 /* Paginación, subcategorías y ruta */
 .paginacion { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center; margin: 30px 0; }
 .paginacion button { margin-top: 0; font-size: 15px; }
@@ -114,11 +111,24 @@ dialog input { padding: 10px; font-size: 16px; }
 .pago a { color: #003f8a; font-weight: bold; word-break: break-all; }
 #dlgCarrito .fila { flex-wrap: wrap; }
 
+/* Checkout */
+a.boton { text-decoration: none; color: black; }
+.campo { display: flex; flex-direction: column; gap: 4px; font-weight: bold; text-align: left; }
+.campo input { font-weight: normal; }
+dialog input[type="radio"] { padding: 0; }
+fieldset.pago-opciones { border: 2px solid #0066cc; border-radius: 12px; padding: 8px 14px 12px; margin: 0; }
+fieldset.pago-opciones legend { font-weight: bold; padding: 0 6px; }
+.opcion-pago { display: flex; gap: 8px; align-items: center; padding: 6px 0; font-weight: bold; cursor: pointer; }
+.alias-box { background: #eef5ff; border-radius: 10px; padding: 8px 12px; margin: 2px 0 8px 26px; }
+.alias-box button { margin-top: 6px; }
+.fila-resumen { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-bottom: 1px solid #eee; font-size: 14px; }
+.aviso-correo { font-size: 14px; color: #555; }
+
 /* ===== Animación al pasar el mouse por un producto ===== */
 .producto { position: relative; transition: transform 0.25s ease, box-shadow 0.25s ease; }
 @media (hover: hover) {
     .producto:hover { transform: scale(1.04); box-shadow: 0 8px 18px rgba(0, 0, 0, 0.55); z-index: 2; }
-    .producto:has(.admin-prod):hover { transform: none; }   /* sin zoom mientras el admin edita */
+    .producto:has(.admin-prod):hover { transform: none; }
 }
 @media (prefers-reduced-motion: reduce) {
     .producto { transition: none; }
@@ -128,45 +138,150 @@ dialog input { padding: 10px; font-size: 16px; }
 /* ===== Adaptación a pantallas ===== */
 img { max-width: 100%; }
 
-/* 1) Tablet: hasta 900px (2 columnas) */
-@media (max-width: 900px) {
+/* PC: se mantiene el diseño original de 3 columnas. */
+
+/* Tablet: 2 columnas */
+@media screen and (max-width: 900px) {
     main { padding: 0 16px 20px; }
     .clases { gap: 14px; }
     .titulo-vista h2 { font-size: 28px; }
+    .grid-productos {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+    }
 }
 
-/* 2) Celular tipo Samsung A52 (412px): 2 columnas compactas */
-@media (max-width: 600px) {
-    header { padding: 14px; }
+/* Celulares: A02s y A52s, 2 columnas compactas */
+@media screen and (max-width: 600px) {
+    body { width: 100%; overflow-x: hidden; }
+
+    header { padding: 14px 10px; }
     header h1 { font-size: 24px; }
-    .clases { justify-content: space-between; gap: 10px; padding: 10px 12px; }
+    header p { margin: 8px 0 0; }
+
+    .clases {
+        justify-content: space-between;
+        gap: 8px;
+        padding: 10px;
+    }
+
     .menu-prod { order: 1; }
     .btn-carrito { order: 2; }
-    #buscador { order: 3; flex: 1 1 100%; width: 100%; box-sizing: border-box; }
-    main { padding: 0 12px 20px; }
-    .titulo-vista h2 { font-size: 24px; }
-    .descripcion { font-size: 16px; }
-    .grid-productos { grid-template-columns: repeat(2, 1fr); gap: 12px; }
-    .producto { padding: 10px; }
-    .producto img { height: 110px; }
-    .producto h3 { font-size: 15px; }
-    .producto p { font-size: 14px; margin: 6px 0; }
-    .producto > button { padding: 8px 12px; font-size: 14px; }
-    .chip { padding: 5px 10px; font-size: 13px; }
-    .paginacion { gap: 6px; }
-    .paginacion button { padding: 8px 10px; font-size: 14px; }
-    .barra-admin { padding: 10px 12px; }
-    .barra-admin button { font-size: 14px; padding: 8px 10px; }
+
+    #buscador, #orden {
+        order: 3;
+        flex: 1 1 100%;
+        width: 100%;
+        box-sizing: border-box;
+        min-width: 0;
+    }
+    #orden { order: 4; }
+
+    #listaCat {
+        min-width: 0;
+        width: min(280px, calc(100vw - 20px));
+        box-sizing: border-box;
+    }
+
+    main {
+        width: 100%;
+        max-width: 1100px;
+        box-sizing: border-box;
+        padding: 0 10px 20px;
+    }
+
+    .titulo-vista { margin: 20px 0 15px; }
+    .titulo-vista h2 { font-size: 23px; }
+    .descripcion { font-size: 15px; }
+
+    /* IMPORTANTE: siempre 2 productos por fila */
+    .grid-productos {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 10px !important;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .producto {
+        width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+        padding: 9px;
+        border-radius: 10px;
+    }
+
+    .producto img {
+        width: 100%;
+        height: 105px;
+        object-fit: cover;
+        border-radius: 8px;
+    }
+
+    .producto h3 {
+        font-size: 14px;
+        line-height: 1.2;
+        margin: 8px 0 4px;
+        overflow-wrap: anywhere;
+    }
+
+    .producto p {
+        font-size: 13px;
+        margin: 5px 0;
+    }
+
+    .producto > button {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 8px 6px;
+        font-size: 13px;
+    }
+
+    .opciones { gap: 4px; }
+    .chip { padding: 5px 7px; font-size: 12px; }
+
+    .paginacion { gap: 5px; }
+    .paginacion button { padding: 7px 9px; font-size: 13px; }
+
+    .barra-admin { padding: 10px; }
+    .barra-admin button { font-size: 13px; padding: 7px 9px; }
     .nuevo-prod > :not(h3) { flex: 1 1 100%; }
-    dialog { padding: 16px; }
+
+    dialog { padding: 16px; width: min(360px, calc(100% - 24px)); box-sizing: border-box; }
+    .fila { flex-wrap: wrap; }
+
+    #dlgCarrito { width: min(640px, calc(100% - 20px)); }
     .fila-carrito { grid-template-columns: 1fr auto; }
-    .subtotal { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; text-align: left; }
+    .subtotal {
+        grid-column: 1 / -1;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        text-align: left;
+    }
     .total-carrito { font-size: 20px; }
+
+    #aviso {
+        max-width: calc(100vw - 20px);
+        box-sizing: border-box;
+        text-align: center;
+    }
 }
 
-/* 3) Celulares chicos: hasta 360px (1 columna) */
-@media (max-width: 360px) {
-    .grid-productos { grid-template-columns: 1fr; }
-    .producto img { height: 160px; }
+/* Celulares más chicos: A02s (~360px), sigue en 2 columnas */
+@media screen and (max-width: 380px) {
+    .grid-productos {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 8px !important;
+    }
+
+    .producto { padding: 7px; }
+    .producto img { height: 85px; }
+    .producto h3 { font-size: 12px; }
+    .producto p { font-size: 11px; }
+    .producto > button { font-size: 11px; padding: 7px 3px; }
+
     header h1 { font-size: 21px; }
+    #btnProd { padding: 9px 12px; }
+    .btn-carrito { padding: 9px 12px; }
 }
