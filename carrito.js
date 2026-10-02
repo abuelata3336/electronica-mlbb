@@ -2,7 +2,10 @@
 const KEY_CARRITO = 'tienda_carrito', MAX_CANT = 99;
 const API = typeof API_PEDIDOS !== 'undefined' ? API_PEDIDOS : '/api/pedidos';
 let pendiente = null, pedidoHecho = null, paso = 'carrito', enviando = false;
-let datosCliente = { nombre: '', telefono: '', direccion: '', pago: '' };
+const PROVINCIAS = ['Buenos Aires', 'Ciudad Autónoma de Buenos Aires', 'Catamarca', 'Chaco', 'Chubut', 'Córdoba', 'Corrientes', 'Entre Ríos', 'Formosa', 'Jujuy', 'La Pampa', 'La Rioja', 'Mendoza', 'Misiones', 'Neuquén', 'Río Negro', 'Salta', 'San Juan', 'San Luis', 'Santa Cruz', 'Santa Fe', 'Santiago del Estero', 'Tierra del Fuego', 'Tucumán'];
+const CAMPOS_DOM = ['calle', 'piso', 'localidad', 'cp', 'provincia', 'referencias'];
+let datosCliente = { nombre: '', telefono: '', pago: '', entrega: 'domicilio', sucursal: '', calle: '', piso: '', localidad: '', cp: '', provincia: 'Buenos Aires', referencias: '' };
+let borradorSuc = [];   // copia editable de las sucursales mientras el administrador las modifica
 
 /* ---- Carrito guardado en el navegador del invitado ---- */
 const leerCarrito = () => { try { return JSON.parse(localStorage.getItem(KEY_CARRITO) || '[]'); } catch { return []; } };
@@ -55,16 +58,33 @@ const filaCarrito = (l) => `<div class="fila-carrito">
     <div class="cantidad"><button data-a="itemMenos" data-k="${esc(l.k)}" aria-label="Menos">−</button><span>${l.n}</span><button data-a="itemMas" data-k="${esc(l.k)}" aria-label="Más">+</button></div>
     <div class="subtotal">${precio(l.sub)}<br><button class="peligro" data-a="itemQuitar" data-k="${esc(l.k)}">Quitar</button></div></div>`;
 
+const sucursalesValidas = () => (textos.sucursales || []).filter((s) => s && s.id && s.nombre);
+
 // Paso 2: datos del cliente + método de pago
 function vistaCheckout() {
-    const d = datosCliente, alias = textos.alias;
+    const d = datosCliente, alias = textos.alias, sucs = sucursalesValidas();
+    if (d.entrega === 'retiro' && !sucs.length) d.entrega = 'domicilio';
     const resumen = lineas().map((l) => `<div class="fila-resumen"><span>${l.n} × ${esc(l.nombre)}</span><span>${precio(l.sub)}</span></div>`).join('');
     return `<h2>Finalizar compra</h2>
         <div>${resumen}<p class="total-carrito">Total: ${precio(totalCarrito())}</p></div>
         <form id="formPedido">
             <label class="campo">Nombre y apellido <input name="nombre" value="${esc(d.nombre)}" required maxlength="80" autocomplete="name"></label>
             <label class="campo">Número de teléfono <input name="telefono" type="tel" value="${esc(d.telefono)}" required maxlength="30" inputmode="tel" autocomplete="tel" placeholder="Ej: 11 2345-6789"></label>
-            <label class="campo">Dirección (de dónde hacés el pedido) <input name="direccion" value="${esc(d.direccion)}" required maxlength="200" autocomplete="street-address" placeholder="Calle, número, localidad"></label>
+            <fieldset class="pago-opciones"><legend>Entrega</legend>
+                <label class="opcion-pago"><input type="radio" name="entrega" value="domicilio" ${d.entrega !== 'retiro' ? 'checked' : ''}> Envío a domicilio</label>
+                ${sucs.length ? `<label class="opcion-pago"><input type="radio" name="entrega" value="retiro" ${d.entrega === 'retiro' ? 'checked' : ''}> Retiro en sucursal</label>` : ''}
+                ${d.entrega === 'retiro' && sucs.length
+                    ? `<label class="campo">Sucursal para retirar <select name="sucursal" required>
+                        <option value="">Elegí una sucursal…</option>
+                        ${sucs.map((s) => `<option value="${esc(s.id)}" ${d.sucursal === s.id ? 'selected' : ''}>${esc(s.nombre)} — ${esc(s.direccion)}</option>`).join('')}
+                       </select></label>`
+                    : `<label class="campo">Calle y número <input name="calle" value="${esc(d.calle)}" required minlength="3" maxlength="120" autocomplete="address-line1" placeholder="Ej: Elizalde 9227"></label>
+                       <label class="campo">Piso / Depto (opcional) <input name="piso" value="${esc(d.piso)}" maxlength="40" autocomplete="address-line2" placeholder="Ej: Piso 2, Depto B"></label>
+                       <label class="campo">Localidad o barrio <input name="localidad" value="${esc(d.localidad)}" required maxlength="80" autocomplete="address-level2" placeholder="Ej: Lomas de Zamora"></label>
+                       <label class="campo">Código postal <input name="cp" value="${esc(d.cp)}" required maxlength="8" inputmode="numeric" autocomplete="postal-code" placeholder="Ej: 1832" pattern="\\d{4}|[A-Za-z]\\d{4}[A-Za-z]{3}" title="4 números (ej: 1832) o formato CPA (ej: B1832ABC)"></label>
+                       <label class="campo">Provincia <select name="provincia" required>${PROVINCIAS.map((pv) => `<option ${d.provincia === pv ? 'selected' : ''}>${pv}</option>`).join('')}</select></label>
+                       <label class="campo">Referencias (opcional) <input name="referencias" value="${esc(d.referencias)}" maxlength="200" placeholder="Ej: entre calles X e Y, timbre 2, casa de rejas negras"></label>`}
+            </fieldset>
             <fieldset class="pago-opciones"><legend>Método de pago</legend>
                 <label class="opcion-pago"><input type="radio" name="pago" value="mercadopago" required ${d.pago === 'mercadopago' ? 'checked' : ''}> Transferencia por Mercado Pago</label>
                 <div class="alias-box">${alias
@@ -80,8 +100,11 @@ function vistaCheckout() {
 
 // Paso 3: pedido confirmado
 function vistaPago() {
-    const o = pedidoHecho, { alias, telefono } = textos, efectivo = o.pago === 'efectivo';
-    const resumen = `Hola! Hice el pedido ${o.id}:\n` + o.items.map((i) => `- ${i.cantidad} x ${i.producto} = ${precio(i.subtotal)}`).join('\n') + `\nTotal: ${precio(o.total)}`;
+    const o = pedidoHecho, { alias, telefono } = textos, efectivo = o.pago === 'efectivo', e = o.entrega || {};
+    const resumen = `Hola! Hice el pedido ${o.id}:\n` + o.items.map((i) => `- ${i.cantidad} x ${i.producto} = ${precio(i.subtotal)}`).join('\n') + `\n${e.tipo === 'retiro' ? 'Retiro en ' + (e.sucursal && e.sucursal.nombre) : 'Envío a ' + e.direccion}\nTotal: ${precio(o.total)}`;
+    const entrega = e.tipo === 'retiro'
+        ? `<p>Retiro en sucursal: <strong>${esc(e.sucursal.nombre)}</strong><br>${esc(e.sucursal.direccion)}</p>`
+        : `<p>Envío a domicilio: <strong>${esc(e.direccion || '')}</strong>${e.referencias ? `<br><small>${esc(e.referencias)}</small>` : ''}</p>`;
     const digitos = telefono.replace(/\D/g, '');
     const wa = digitos ? `<p>WhatsApp del negocio: <a href="https://wa.me/${digitos}?text=${encodeURIComponent(resumen)}" target="_blank" rel="noopener">${esc(telefono)}</a></p>` : '';
     const pago = efectivo
@@ -91,7 +114,7 @@ function vistaPago() {
             : '<p>Te vamos a contactar para pasarte el alias y coordinar el pago.</p>';
     return `<h2>¡Pedido ${esc(o.id)} confirmado!</h2>
         <p>Total: <strong>${precio(o.total)}</strong></p>
-        <div class="pago">${pago}${wa}</div>
+        <div class="pago">${entrega}${pago}${wa}</div>
         <p>Se descargó tu comprobante en PDF. Si no se descargó, usá estos botones:</p>
         <div class="fila"><a class="boton" href="${urlPdf()}" download="comprobante-${esc(o.id)}.pdf">Descargar PDF</a>
         <a class="boton secundario" href="${urlPdf()}" target="_blank" rel="noopener">Abrir / imprimir</a></div>
@@ -118,7 +141,11 @@ function leerFormulario() {
     const f = $('formPedido');
     if (!f) return;
     const fd = new FormData(f), t = (n) => String(fd.get(n) || '').trim();
-    datosCliente = { nombre: t('nombre'), telefono: t('telefono'), direccion: t('direccion'), pago: t('pago') };
+    datosCliente = {
+        nombre: t('nombre'), telefono: t('telefono'), pago: t('pago'), entrega: t('entrega') || datosCliente.entrega,
+        ...Object.fromEntries(CAMPOS_DOM.map((k) => [k, fd.has(k) ? t(k) : datosCliente[k]])),
+        sucursal: fd.has('sucursal') ? t('sucursal') : datosCliente.sucursal,
+    };
 }
 function errorPedido(msg) {
     const e = $('errPedido'), b = $('btnComprar');
@@ -131,6 +158,9 @@ async function enviarPedido() {
     const d = datosCliente, ls = lineas();
     if (!ls.length) return;
     if (d.telefono.replace(/\D/g, '').length < 6) return errorPedido('Ingresá un teléfono válido.');
+    if (d.entrega === 'retiro' && !d.sucursal) return errorPedido('Elegí la sucursal donde vas a retirar.');
+    if (d.entrega !== 'retiro' && (d.calle.length < 3 || !d.localidad || !d.provincia)) return errorPedido('Completá calle y número, localidad y provincia.');
+    if (d.entrega !== 'retiro' && !/^(\d{4}|[A-Za-z]\d{4}[A-Za-z]{3})$/.test(d.cp.replace(/\s/g, ''))) return errorPedido('Ingresá un código postal válido (4 números, ej: 1832).');
     if (!d.pago) return errorPedido('Elegí un método de pago.');
     enviando = true;
     errorPedido('');
@@ -140,12 +170,14 @@ async function enviarPedido() {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 id: 'PED-' + Date.now().toString(36).toUpperCase(),
-                cliente: { nombre: d.nombre, telefono: d.telefono, direccion: d.direccion }, pago: d.pago,
+                cliente: { nombre: d.nombre, telefono: d.telefono }, pago: d.pago,
+                entrega: d.entrega === 'retiro' ? { tipo: 'retiro', sucursalId: d.sucursal } : { tipo: 'domicilio', calle: d.calle, piso: d.piso, localidad: d.localidad, cp: d.cp, provincia: d.provincia, referencias: d.referencias },
                 items: ls.map((l) => ({ c: l.c, p: l.p, v: l.v, cantidad: l.n, producto: l.nombre, precioUnitario: l.unit })),
             }),
         });
         const res = await r.json().catch(() => ({}));
         if (!r.ok || !res.ok) throw new Error(res.error || `El servidor respondió con error ${r.status}.`);
+        if (!Array.isArray(res.items) || !res.pdf) throw new Error('El servidor de la tienda todavía no tiene la versión nueva (falta actualizar las funciones en Netlify).');
         pedidoHecho = res; paso = 'carrito';
         guardarCarrito([]);          // vacía el carrito y muestra la confirmación
         descargarPdf();              // descarga automática del comprobante
@@ -187,6 +219,19 @@ const accionesCarrito = {
         Object.assign(textos, { alias: a.trim(), telefono: t.trim() });
         guardarTextos();
     },
+    /* Sucursales de retiro: el administrador las agrega, edita o elimina; se publican con el resto de la tienda */
+    editarSucursales() { borradorSuc = structuredClone(textos.sucursales || []); pintarSucursales(); $('dlgSuc').showModal(); },
+    sucAgregar() { borradorSuc.push({ id: nuevoId('s'), nombre: '', direccion: '' }); pintarSucursales(); },
+    sucQuitar(el) { borradorSuc.splice(Number(el.dataset.i), 1); pintarSucursales(); },
+    sucCerrar() { $('dlgSuc').close(); },
+    sucGuardar() {
+        const lista = borradorSuc.map((s) => ({ id: s.id, nombre: s.nombre.trim(), direccion: s.direccion.trim() }));
+        if (lista.some((s) => !s.nombre || !s.direccion)) return alert('Completá el nombre y la dirección de cada sucursal (o quitá las que estén vacías).');
+        textos.sucursales = lista;
+        guardarTextos();
+        $('dlgSuc').close();
+        avisar(lista.length ? `Sucursales guardadas (${lista.length})` : 'Sin sucursales: los clientes solo verán envío a domicilio');
+    },
     // Gmail que recibe los PDF de los pedidos. Se guarda SOLO en el servidor y únicamente el administrador puede verlo o cambiarlo.
     async editarCorreoPedidos() {
         const cred = credenciales();
@@ -207,6 +252,17 @@ const accionesCarrito = {
     },
 };
 
+function pintarSucursales() {
+    $('cuerpoSuc').innerHTML = `<h2>Sucursales de retiro</h2>
+        <p><small>Los clientes eligen una de estas al retirar su pedido. Si no cargás ninguna, solo se ofrece envío a domicilio.</small></p>
+        ${borradorSuc.map((s, i) => `<div class="var-fila">
+            <input data-i="${i}" data-campo="nombre" value="${esc(s.nombre)}" placeholder="Nombre (ej: Local Lomas)" maxlength="80" aria-label="Nombre de la sucursal">
+            <input data-i="${i}" data-campo="direccion" value="${esc(s.direccion)}" placeholder="Dirección (ej: Elizalde 9227, Lomas de Zamora)" maxlength="200" aria-label="Dirección de la sucursal">
+            <button type="button" class="peligro" data-a="sucQuitar" data-i="${i}">Eliminar</button></div>`).join('') || '<p class="vacio">Todavía no hay sucursales.</p>'}
+        <div class="fila"><button type="button" class="secundario" data-a="sucAgregar">+ Agregar sucursal</button></div>
+        <div class="fila"><button type="button" data-a="sucGuardar">Guardar</button><button type="button" class="secundario" data-a="sucCerrar">Cancelar</button></div>`;
+}
+
 function iniciarCarrito() {
     document.body.insertAdjacentHTML('beforeend', `
         <dialog id="dlgCant"><form id="formCant">
@@ -219,12 +275,21 @@ function iniciarCarrito() {
             </div>
             <div class="fila"><button type="submit">Agregar al carrito</button><button type="button" class="secundario" data-a="cantCancelar">Cancelar</button></div>
         </form></dialog>
-        <dialog id="dlgCarrito"><div id="cuerpoCarrito"></div></dialog>`);
+        <dialog id="dlgCarrito"><div id="cuerpoCarrito"></div></dialog>
+        <dialog id="dlgSuc"><div id="cuerpoSuc"></div></dialog>`);
     Object.assign(acciones, accionesCarrito);
     $('btnCarrito').addEventListener('click', () => { pedidoHecho = null; paso = 'carrito'; pintarCarrito(); $('dlgCarrito').showModal(); });
     $('dlgCarrito').addEventListener('close', () => { pedidoHecho = null; paso = 'carrito'; });
     $('dlgCarrito').addEventListener('submit', (e) => { if (e.target.id === 'formPedido') { e.preventDefault(); enviarPedido(); } });
-    $('dlgCarrito').addEventListener('input', (e) => { if (e.target.form && e.target.form.id === 'formPedido') leerFormulario(); });
+    $('dlgCarrito').addEventListener('input', (e) => {
+        if (!e.target.form || e.target.form.id !== 'formPedido') return;
+        leerFormulario();
+        if (e.target.name === 'entrega') pintarCarrito();   // cambia el campo de dirección por la lista de sucursales (o al revés)
+    });
+    $('dlgSuc').addEventListener('input', (e) => {
+        const i = e.target.dataset.i;
+        if (i !== undefined) borradorSuc[i][e.target.dataset.campo] = e.target.value;
+    });
     $('formCant').addEventListener('submit', (e) => {
         e.preventDefault();
         const n = Math.floor(Number($('cantInput').value));

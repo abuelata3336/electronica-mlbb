@@ -17,7 +17,7 @@ const INICIAL = [
 ];
 
 let datos = JSON.parse(localStorage.getItem(KEY) || 'null') || structuredClone(INICIAL);
-const TXT_BASE = { titulo: 'ELECTRONICA B.I.B', eslogan: 'Tu tienda de confianza', pedidos: true, alias: '', telefono: '', gmail: '' };
+const TXT_BASE = { titulo: 'ELECTRONICA B.I.B', eslogan: 'Tu tienda de confianza', pedidos: true, alias: '', telefono: '', gmail: '', sucursales: [] };
 const conBase = (t) => ({ ...TXT_BASE, ...t });
 let textos = conBase(JSON.parse(localStorage.getItem(KEY_TXT) || 'null'));
 function guardarTextos() { localStorage.setItem(KEY_TXT, JSON.stringify(textos)); localStorage.setItem(KEY_CAMBIO, Date.now()); sincronizar(); render(); }
@@ -206,6 +206,7 @@ function renderBarra() {
         <button data-a="editarTextos">Editar título y eslogan</button>
         <button data-a="togglePedidos" class="${textos.pedidos ? '' : 'secundario'}">Pedidos: ${textos.pedidos ? 'ACTIVADO' : 'DESACTIVADO'}</button>
         <button data-a="editarCobro">Datos de cobro</button>
+        <button data-a="editarSucursales">Sucursales de retiro (${(textos.sucursales || []).length})</button>
         <button data-a="editarCorreoPedidos">Correo de pedidos (privado)</button>
         <button data-a="nuevaCat">+ Nueva categoría</button>
         <button data-a="exportar" class="secundario">Descargar copia</button>

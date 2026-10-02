@@ -112,6 +112,9 @@ dialog input { padding: 10px; font-size: 16px; }
 #dlgCarrito .fila { flex-wrap: wrap; }
 
 /* Checkout */
+#dlgSuc { width: min(560px, 95%); max-height: 90vh; overflow-y: auto; }
+#dlgSuc input { width: 100%; box-sizing: border-box; }
+.campo select { font-weight: normal; padding: 10px; font-size: 16px; }
 a.boton { text-decoration: none; color: black; }
 .campo { display: flex; flex-direction: column; gap: 4px; font-weight: bold; text-align: left; }
 .campo input { font-weight: normal; }
