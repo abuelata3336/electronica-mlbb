@@ -28,7 +28,7 @@ async function avisarAlNegocio(pedido, pdf, destino) {
     if (!usuario || !clave || !(destino || usuario)) { console.error("Falta GMAIL_USER o GMAIL_APP_PASSWORD: no se envió el correo del pedido", pedido.id); return false; }
     try {
         const c = pedido.cliente, e = pedido.entrega;
-        const destinoTexto = e.tipo === "retiro" ? `Sucursal elegida: ${e.sucursal.nombre} - ${e.sucursal.direccion}` : `Dirección de destino: ${e.direccion}`;
+        const destinoTexto = e.tipo === "retiro" ? `Sucursal elegida: ${e.sucursal.nombre} - ${e.sucursal.direccion}` : `Dirección de destino: ${e.direccion}${e.referencias ? "\\nReferencias: " + e.referencias : ""}`;
         const correo = nodemailer.createTransport({ service: "gmail", auth: { user: usuario, pass: clave.replace(/\s/g, "") } });
         await correo.sendMail({
             from: `"Pedidos de la tienda" <${usuario}>`,

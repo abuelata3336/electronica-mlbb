@@ -20,11 +20,22 @@ export function armarPedido(o, catalogo) {
         const suc = Array.isArray(lista) && lista.find((x) => x && x.id === en.sucursalId);
         if (!suc) return err("Elegí una sucursal de la lista (puede que ya no esté disponible).", 409);
         entrega = { tipo: "retiro", sucursal: { id: suc.id, nombre: txt(suc.nombre, 80), direccion: txt(suc.direccion, 200) } };
-    } else {   // sin "entrega" (página vieja en caché) se toma como domicilio con la dirección del cliente
+    } else if (en.calle === undefined && txt(en.direccion ?? cl.direccion, 200)) {
+        // página vieja en caché: una sola línea de dirección
         const direccion = txt(en.direccion ?? cl.direccion, 200);
         if (direccion.length < 5) return err("Ingresá la dirección de entrega.");
         entrega = { tipo: "domicilio", direccion };
+    } else {
+        const calle = txt(en.calle, 120), piso = txt(en.piso, 40), localidad = txt(en.localidad, 80);
+        const provincia = txt(en.provincia, 40), referencias = txt(en.referencias, 200), cp = txt(en.cp, 10).toUpperCase().replace(/\s/g, "");
+        if (calle.length < 3) return err("Ingresá la calle y el número.");
+        if (!localidad) return err("Ingresá la localidad o barrio.");
+        if (!/^(\d{4}|[A-Z]\d{4}[A-Z]{3})$/.test(cp)) return err("Ingresá un código postal válido (4 números, ej: 1832).");
+        if (!provincia) return err("Elegí la provincia.");
+        const direccion = [calle, piso, localidad].filter(Boolean).join(", ") + ` (CP ${cp}), ${provincia}`;
+        entrega = { tipo: "domicilio", calle, piso, localidad, cp, provincia, referencias, direccion };
     }
+
     if (!PAGOS[o.pago]) return err("Elegí un método de pago.");
     if (!Array.isArray(o.items) || !o.items.length || o.items.length > 50) return err("El carrito está vacío o es demasiado grande.");
 

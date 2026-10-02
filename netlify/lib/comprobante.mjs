@@ -59,7 +59,10 @@ export async function generarComprobante(pedido, { tienda = "Tienda", alias = ""
     campo("Pago:", PAGOS[pedido.pago] + (pedido.pago === "mercadopago" && alias ? ` - Alias: ${alias}` : ""));
     campo("Tipo de entrega:", ENTREGAS[e.tipo]);
     if (e.tipo === "retiro") campo("Sucursal elegida:", `${e.sucursal.nombre} - ${e.sucursal.direccion}`);
-    else campo("Dirección de destino:", e.direccion);
+    else {
+        campo("Dirección de destino:", e.direccion);
+        if (e.referencias) campo("Referencias:", e.referencias);
+    }
     y -= 12;
 
     if (paraNegocio) {
