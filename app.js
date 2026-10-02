@@ -17,7 +17,7 @@ const INICIAL = [
 ];
 
 let datos = JSON.parse(localStorage.getItem(KEY) || 'null') || structuredClone(INICIAL);
-const TXT_BASE = { titulo: 'ELECTRONICA B.I.B', eslogan: 'Tu tienda de confianza', pedidos: true, alias: '', telefono: '', gmail: '', sucursales: [] };
+const TXT_BASE = { titulo: 'ELECTRONICA B.I.B', eslogan: 'Tu tienda de confianza', pedidos: true, alias: '', telefono: '', gmail: '', sucursales: [], envioActivo: true, retiroActivo: true };
 const conBase = (t) => ({ ...TXT_BASE, ...t });
 let textos = conBase(JSON.parse(localStorage.getItem(KEY_TXT) || 'null'));
 function guardarTextos() { localStorage.setItem(KEY_TXT, JSON.stringify(textos)); localStorage.setItem(KEY_CAMBIO, Date.now()); sincronizar(); render(); }
@@ -206,6 +206,8 @@ function renderBarra() {
         <button data-a="editarTextos">Editar título y eslogan</button>
         <button data-a="togglePedidos" class="${textos.pedidos ? '' : 'secundario'}">Pedidos: ${textos.pedidos ? 'ACTIVADO' : 'DESACTIVADO'}</button>
         <button data-a="editarCobro">Datos de cobro</button>
+        <button data-a="toggleEnvio" class="${textos.envioActivo !== false ? '' : 'secundario'}">Envío a domicilio: ${textos.envioActivo !== false ? 'ACTIVADO' : 'DESACTIVADO'}</button>
+        <button data-a="toggleRetiro" class="${textos.retiroActivo !== false ? '' : 'secundario'}">Retiro en sucursal: ${textos.retiroActivo !== false ? 'ACTIVADO' : 'DESACTIVADO'}</button>
         <button data-a="editarSucursales">Sucursales de retiro (${(textos.sucursales || []).length})</button>
         <button data-a="editarCorreoPedidos">Correo de pedidos (privado)</button>
         <button data-a="nuevaCat">+ Nueva categoría</button>

@@ -59,11 +59,17 @@ const filaCarrito = (l) => `<div class="fila-carrito">
     <div class="subtotal">${precio(l.sub)}<br><button class="peligro" data-a="itemQuitar" data-k="${esc(l.k)}">Quitar</button></div></div>`;
 
 const sucursalesValidas = () => (textos.sucursales || []).filter((s) => s && s.id && s.nombre);
+// Formas de entrega que el negocio tiene habilitadas ahora (el retiro además necesita al menos una sucursal cargada)
+const envioHabilitado = () => textos.envioActivo !== false;
+const retiroHabilitado = () => textos.retiroActivo !== false && sucursalesValidas().length > 0;
 
 // Paso 2: datos del cliente + método de pago
 function vistaCheckout() {
     const d = datosCliente, alias = textos.alias, sucs = sucursalesValidas();
-    if (d.entrega === 'retiro' && !sucs.length) d.entrega = 'domicilio';
+    const hayEnvio = envioHabilitado(), hayRetiro = retiroHabilitado();
+    if (!hayEnvio && !hayRetiro) return `<h2>Finalizar compra</h2><p class="vacio">Por el momento no hay formas de entrega disponibles. Escribinos por WhatsApp para coordinar tu pedido.</p><div class="fila"><button type="button" class="secundario" data-a="volverCarrito">Volver al carrito</button></div>`;
+    if (d.entrega === 'retiro' && !hayRetiro) d.entrega = 'domicilio';
+    if (d.entrega !== 'retiro' && !hayEnvio) d.entrega = 'retiro';
     const resumen = lineas().map((l) => `<div class="fila-resumen"><span>${l.n} × ${esc(l.nombre)}</span><span>${precio(l.sub)}</span></div>`).join('');
     return `<h2>Finalizar compra</h2>
         <div>${resumen}<p class="total-carrito">Total: ${precio(totalCarrito())}</p></div>
@@ -71,14 +77,14 @@ function vistaCheckout() {
             <label class="campo">Nombre y apellido <input name="nombre" value="${esc(d.nombre)}" required maxlength="80" autocomplete="name"></label>
             <label class="campo">Número de teléfono <input name="telefono" type="tel" value="${esc(d.telefono)}" required maxlength="30" inputmode="tel" autocomplete="tel" placeholder="Ej: 11 2345-6789"></label>
             <fieldset class="pago-opciones"><legend>Entrega</legend>
-                <label class="opcion-pago"><input type="radio" name="entrega" value="domicilio" ${d.entrega !== 'retiro' ? 'checked' : ''}> Envío a domicilio</label>
-                ${sucs.length ? `<label class="opcion-pago"><input type="radio" name="entrega" value="retiro" ${d.entrega === 'retiro' ? 'checked' : ''}> Retiro en sucursal</label>` : ''}
-                ${d.entrega === 'retiro' && sucs.length
+                ${hayEnvio ? `<label class="opcion-pago"><input type="radio" name="entrega" value="domicilio" ${d.entrega !== 'retiro' ? 'checked' : ''}> Envío a domicilio</label>` : ''}
+                ${hayRetiro ? `<label class="opcion-pago"><input type="radio" name="entrega" value="retiro" ${d.entrega === 'retiro' ? 'checked' : ''}> Retiro en sucursal</label>` : ''}
+                ${d.entrega === 'retiro'
                     ? `<label class="campo">Sucursal para retirar <select name="sucursal" required>
                         <option value="">Elegí una sucursal…</option>
                         ${sucs.map((s) => `<option value="${esc(s.id)}" ${d.sucursal === s.id ? 'selected' : ''}>${esc(s.nombre)} — ${esc(s.direccion)}</option>`).join('')}
                        </select></label>`
-                    : `<label class="campo">Calle y número <input name="calle" value="${esc(d.calle)}" required minlength="3" maxlength="120" autocomplete="address-line1" placeholder="Ej: Elizalde 9227"></label>
+                    : `<label class="campo">Calle y número <input name="calle" value="${esc(d.calle)}" required minlength="3" maxlength="120" autocomplete="address-line1" placeholder="Ej: Elizalde 1234"></label>
                        <label class="campo">Piso / Depto (opcional) <input name="piso" value="${esc(d.piso)}" maxlength="40" autocomplete="address-line2" placeholder="Ej: Piso 2, Depto B"></label>
                        <label class="campo">Localidad o barrio <input name="localidad" value="${esc(d.localidad)}" required maxlength="80" autocomplete="address-level2" placeholder="Ej: Lomas de Zamora"></label>
                        <label class="campo">Código postal <input name="cp" value="${esc(d.cp)}" required maxlength="8" inputmode="numeric" autocomplete="postal-code" placeholder="Ej: 1832" pattern="\\d{4}|[A-Za-z]\\d{4}[A-Za-z]{3}" title="4 números (ej: 1832) o formato CPA (ej: B1832ABC)"></label>
@@ -210,6 +216,14 @@ const accionesCarrito = {
     volverCarrito() { leerFormulario(); paso = 'carrito'; pintarCarrito(); },
     copiarAlias() { navigator.clipboard.writeText(textos.alias).then(() => avisar('Alias copiado')); },
     /* Panel de administrador */
+    toggleEnvio() {
+        if (envioHabilitado() && !retiroHabilitado()) return alert('No podés desactivar el envío: el retiro en sucursal tampoco está disponible y los clientes no podrían comprar.');
+        textos.envioActivo = !envioHabilitado(); guardarTextos();
+    },
+    toggleRetiro() {
+        if (textos.retiroActivo !== false && !envioHabilitado()) return alert('No podés desactivar el retiro: el envío a domicilio tampoco está activado y los clientes no podrían comprar.');
+        textos.retiroActivo = textos.retiroActivo === false; guardarTextos();
+    },
     togglePedidos() { textos.pedidos = !textos.pedidos; guardarTextos(); },
     editarCobro() {
         const a = prompt('Alias de Mercado Pago (vacío = no se muestra):', textos.alias);
@@ -257,7 +271,7 @@ function pintarSucursales() {
         <p><small>Los clientes eligen una de estas al retirar su pedido. Si no cargás ninguna, solo se ofrece envío a domicilio.</small></p>
         ${borradorSuc.map((s, i) => `<div class="var-fila">
             <input data-i="${i}" data-campo="nombre" value="${esc(s.nombre)}" placeholder="Nombre (ej: Local Lomas)" maxlength="80" aria-label="Nombre de la sucursal">
-            <input data-i="${i}" data-campo="direccion" value="${esc(s.direccion)}" placeholder="Dirección (ej: Elizalde 9227, Lomas de Zamora)" maxlength="200" aria-label="Dirección de la sucursal">
+            <input data-i="${i}" data-campo="direccion" value="${esc(s.direccion)}" placeholder="Dirección (ej: Elizalde 1234, Lomas de Zamora)" maxlength="200" aria-label="Dirección de la sucursal">
             <button type="button" class="peligro" data-a="sucQuitar" data-i="${i}">Eliminar</button></div>`).join('') || '<p class="vacio">Todavía no hay sucursales.</p>'}
         <div class="fila"><button type="button" class="secundario" data-a="sucAgregar">+ Agregar sucursal</button></div>
         <div class="fila"><button type="button" data-a="sucGuardar">Guardar</button><button type="button" class="secundario" data-a="sucCerrar">Cancelar</button></div>`;

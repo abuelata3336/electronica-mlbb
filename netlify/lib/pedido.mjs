@@ -14,6 +14,9 @@ export function armarPedido(o, catalogo) {
 
     // Entrega: envío a domicilio (requiere dirección) o retiro en una sucursal que exista en la lista del administrador
     const en = o.entrega || {};
+    const ajustes = (catalogo && catalogo.textos) || {};
+    if (en.tipo === "retiro" && ajustes.retiroActivo === false) return err("El retiro en sucursal no está disponible por el momento.", 409);
+    if (en.tipo !== "retiro" && ajustes.envioActivo === false) return err("El envío a domicilio no está disponible por el momento.", 409);
     let entrega;
     if (en.tipo === "retiro") {
         const lista = catalogo && catalogo.textos && catalogo.textos.sucursales;
