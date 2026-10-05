@@ -9,7 +9,7 @@ const fmt = (t) => (t ? new Date(Number(t)).toLocaleString('es-AR', { dateStyle:
 // Usuario y clave del administrador se validan en el servidor (Netlify)
 
 const mk = (carpeta, letra, precios) =>
-    precios.map((p, i) => ({ id: letra + (i + 1), nombre: '', foto: `${carpeta}/${i + 1}${letra}.jpg`, precio: p, stock: true, variantes: [] }));
+    precios.map((p, i) => ({ id: letra + (i + 1), nombre: '', foto: `${carpeta}/${i + 1}${letra}.jpg`, precio: p, stock: true, variantes: [], descripcion: '' }));
 const INICIAL = [
     { id: 'clase1', nombre: 'AURICULARES', desc: 'Auriculares de cable e inalámbricos', productos: mk('abricular', 'a', [9000, 10000, 12000, 12000, 9000, 12000, 5500, 2500, 2500]) },
     { id: 'clase2', nombre: 'PARLANTES', desc: 'Distintos tipos de parlantes inalámbricos', productos: mk('parlante', 'p', [20000, 10000, 8500, 12000, 8000, 18000, 39000, 20000, 1000]) },
@@ -28,9 +28,10 @@ const credenciales = () => JSON.parse(sessionStorage.getItem(KEY_AUTH) || 'null'
 let vista = 'todo', pagina = 1, busqueda = '', orden = '';
 const sel = {};               // opción elegida por producto
 const abiertos = new Set();   // paneles de opciones abiertos (admin)
+let fichaAbierta = null;      // producto que se está viendo en la ficha {c, p}
 
 document.body.insertAdjacentHTML('beforeend',
-    '<dialog id="visor"><img alt=""><button type="button">Cerrar ✕</button></dialog><div id="aviso" role="status" hidden></div>');
+    '<dialog id="ficha" aria-labelledby="fichaTitulo"></dialog><dialog id="visor"><img alt=""><button type="button">Cerrar ✕</button></dialog><div id="aviso" role="status" hidden></div>');
 
 const estado = () => JSON.stringify({ textos, categorias: datos });
 const snaps = () => JSON.parse(localStorage.getItem(KEY_SNAP) || '[]');
@@ -117,11 +118,12 @@ function producto(c, p) {
     const v = vars.find((x) => x.id === sel[p.id]) || vars[0];
     const foto = (v && v.foto) || p.foto;
     const agotado = p.stock === false || (v && v.stock === false);
-    const chips = vars.length ? `<div class="opciones">${vars.map((x) => `<button class="chip${x === v ? ' sel' : ''}${x.stock === false ? ' tachada' : ''}" data-a="opcion" data-p="${p.id}" data-v="${x.id}" aria-pressed="${x === v}">${esc(x.nombre)}</button>`).join('')}</div>` : '';
+    const chips = chipsHTML(p, v);
     const admin = esAdmin ? `
         <div class="admin-prod">
             <label>Nombre <input class="in-nombre" value="${esc(p.nombre)}" placeholder="Ej: Parlante JBL"></label>
             <label>Precio <input type="number" min="0" value="${p.precio}" class="in-precio"></label>
+            <label>Descripción <textarea class="in-desc" rows="4" maxlength="2000" placeholder="Detalles del producto: medidas, características, garantía…">${esc(p.descripcion || '')}</textarea></label>
             <button data-a="guardarProd" data-c="${c.id}" data-p="${p.id}">Guardar cambios</button>
             <label class="check"><input type="checkbox" data-a="sinstock" data-c="${c.id}" data-p="${p.id}" ${p.stock === false ? 'checked' : ''}> Sin stock (todo el producto)</label>
             <label class="boton secundario">Cambiar foto principal
@@ -130,8 +132,8 @@ function producto(c, p) {
             ${panelOpciones(c, p)}
             <button class="peligro" data-a="borrarProd" data-c="${c.id}" data-p="${p.id}">Eliminar producto</button>
         </div>` : '';
-    return `<div class="producto${agotado ? ' agotado' : ''}">
-        <img src="${esc(foto)}" alt="${esc(p.nombre || c.nombre)}" title="Tocá para ampliar">
+    return `<div class="producto${agotado ? ' agotado' : ''}" data-c="${c.id}" data-p="${p.id}">
+        <img src="${esc(foto)}" alt="${esc(p.nombre || c.nombre)}" tabindex="0" title="Ver detalles">
         ${vista === 'todo' ? `<small class="ruta">${esc(c.nombre)}</small>` : ''}
         ${p.nombre ? `<h3>${esc(p.nombre)}</h3>` : ''}
         ${chips}
@@ -140,6 +142,38 @@ function producto(c, p) {
         ${textos.pedidos ? `<button data-a="comprar" data-c="${c.id}" data-p="${p.id}" data-v="${v ? v.id : ''}" ${agotado ? 'disabled' : ''}>${agotado ? 'No disponible' : 'Comprar'}</button>` : ''}${admin}
     </div>`;
 }
+
+/* ============ FICHA DE DETALLE (modal con la descripción) ============ */
+const chipsHTML = (p, v) => (p.variantes || []).length
+    ? `<div class="opciones">${p.variantes.map((x) => `<button class="chip${x === v ? ' sel' : ''}${x.stock === false ? ' tachada' : ''}" data-a="opcion" data-p="${p.id}" data-v="${x.id}" aria-pressed="${x === v}">${esc(x.nombre)}</button>`).join('')}</div>` : '';
+
+function pintarFicha() {
+    const c = fichaAbierta && buscar(fichaAbierta.c), p = c && c.productos.find((x) => x.id === fichaAbierta.p);
+    if (!p) { $('ficha').close(); return; }
+    const vars = p.variantes || [], v = vars.find((x) => x.id === sel[p.id]) || vars[0];
+    const foto = (v && v.foto) || p.foto, agotado = p.stock === false || (v && v.stock === false);
+    $('ficha').innerHTML = `
+        <button type="button" class="ficha-cerrar" data-a="cerrarFicha" aria-label="Cerrar">✕</button>
+        <div class="ficha-cuerpo">
+            <img class="ficha-img" src="${esc(foto)}" alt="${esc(p.nombre || c.nombre)}" title="Tocá para ampliar">
+            <div class="ficha-info">
+                <small class="ruta">${esc(c.nombre)}</small>
+                <h2 id="fichaTitulo">${esc(p.nombre || c.nombre)}</h2>
+                <p class="ficha-precio">${precio(p.precio)}</p>
+                ${chipsHTML(p, v)}
+                ${agotado ? '<p class="stock no">Sin stock</p>' : ''}
+                <h3>Descripción</h3>
+                <p class="ficha-desc">${p.descripcion ? esc(p.descripcion) : 'Este producto todavía no tiene descripción.'}</p>
+                ${textos.pedidos ? `<button data-a="comprarDesdeFicha" data-c="${c.id}" data-p="${p.id}" data-v="${v ? v.id : ''}" ${agotado ? 'disabled' : ''}>${agotado ? 'No disponible' : 'Comprar'}</button>` : ''}
+            </div>
+        </div>`;
+}
+function abrirFicha(cid, pid) {
+    fichaAbierta = { c: cid, p: pid };
+    pintarFicha();
+    if (!$('ficha').open) $('ficha').showModal();
+}
+$('ficha').addEventListener('close', () => { fichaAbierta = null; });
 
 function herramientasAdmin(cat) {
     const base = cat || datos[0];
@@ -152,6 +186,7 @@ function herramientasAdmin(cat) {
             <select class="n-cat" aria-label="Categoría">${datos.map((c) => `<option value="${c.id}" ${base && base.id === c.id ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}</select>
             <input class="n-nombre" placeholder="Nombre">
             <input class="n-precio" type="number" min="0" placeholder="Precio">
+            <textarea class="n-desc" rows="3" maxlength="2000" placeholder="Descripción del producto (opcional)"></textarea>
             <input class="n-foto" type="file" accept="image/*">
             <button data-a="agregarProd">Agregar producto</button>
         </div>`;
@@ -230,6 +265,7 @@ function render() {
     $('btnAcceso').hidden = esAdmin;
     $('btnCarrito').hidden = !textos.pedidos;
     actualizarContador();
+    if (fichaAbierta && $('ficha').open) pintarFicha();
 }
 
 /* ============ MENÚ, BUSCADOR, VISOR ============ */
@@ -244,11 +280,15 @@ $('buscador').addEventListener('input', (e) => { busqueda = e.target.value; pagi
 $('visor').addEventListener('click', () => $('visor').close());
 document.addEventListener('click', (e) => {
     if (!e.target.closest('.menu-prod')) cerrarMenu();
-    const im = e.target.closest('.producto img');
-    if (im) { const v = $('visor').querySelector('img'); v.src = im.src; v.alt = im.alt; $('visor').showModal(); }
+    const t = e.target;
+    if (t.matches('.ficha-img')) { const v = $('visor').querySelector('img'); v.src = t.src; v.alt = t.alt; return $('visor').showModal(); }
+    if (t === $('ficha')) return $('ficha').close();   // clic en el fondo oscuro
+    const card = t.closest('.producto');
+    if (card && !t.closest('button, input, select, textarea, label, a, summary, details, .admin-prod')) abrirFicha(card.dataset.c, card.dataset.p);
 });
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') cerrarMenu();
+    if (e.key === 'Enter' && e.target.matches && e.target.matches('.producto img')) e.target.click();
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && esAdmin) { e.preventDefault(); acciones.guardarPunto(); }
 });
 document.addEventListener('toggle', (e) => {
@@ -264,7 +304,9 @@ const varDe = (el) => prodDe(el).variantes.find((x) => x.id === el.dataset.v);
 const acciones = {
     verCat(el) { vista = el.dataset.c; pagina = 1; cerrarMenu(); render(); },
     pag(el) { pagina = Number(el.dataset.n); renderContenido(); window.scrollTo({ top: 0 }); },
-    opcion(el) { sel[el.dataset.p] = el.dataset.v; renderContenido(); },
+    opcion(el) { sel[el.dataset.p] = el.dataset.v; renderContenido(); if ($('ficha').open) pintarFicha(); },
+    cerrarFicha() { $('ficha').close(); },
+    comprarDesdeFicha(el) { $('ficha').close(); acciones.comprar(el); },
     guardarPunto() {
         let g = snaps();
         if (g.length && JSON.stringify({ textos: g[g.length - 1].textos, categorias: g[g.length - 1].categorias }) === estado()) return avisar('No hay cambios nuevos para guardar.');
@@ -326,7 +368,7 @@ const acciones = {
         if (!archivo || pr === '') return alert('Elegí una foto y escribí el precio.');
         try {
             const foto = await leerImagen(archivo);
-            c.productos.push({ id: nuevoId('p'), nombre: caja.querySelector('.n-nombre').value.trim(), foto, precio: Number(pr), stock: true, variantes: [] });
+            c.productos.push({ id: nuevoId('p'), nombre: caja.querySelector('.n-nombre').value.trim(), foto, precio: Number(pr), stock: true, variantes: [], descripcion: caja.querySelector('.n-desc').value.trim().slice(0, 2000) });
             guardar();
         } catch { alert('No se pudo leer la imagen.'); }
     },
@@ -335,6 +377,7 @@ const acciones = {
         if (v === '') return alert('Escribí un precio.');
         const p = prodDe(el);
         p.precio = Number(v); p.nombre = caja.querySelector('.in-nombre').value.trim();
+        p.descripcion = caja.querySelector('.in-desc').value.trim().slice(0, 2000);
         guardar();
     },
     borrarProd(el) {

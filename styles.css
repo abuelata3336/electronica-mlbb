@@ -288,3 +288,28 @@ img { max-width: 100%; }
     #btnProd { padding: 9px 12px; }
     .btn-carrito { padding: 9px 12px; }
 }
+
+/* ===== Ficha de producto (modal con descripción) ===== */
+.producto { cursor: pointer; }
+.producto img { cursor: pointer; }
+.admin-prod textarea, .nuevo-prod textarea { width: 100%; box-sizing: border-box; padding: 6px; font-family: inherit; font-size: 14px; resize: vertical; }
+#ficha { width: min(860px, 94vw); max-height: 92vh; overflow-y: auto; padding: 20px; box-sizing: border-box; }
+#ficha[open] { animation: fichaEntrar 0.25s ease; }
+@keyframes fichaEntrar { from { opacity: 0; transform: translateY(14px) scale(0.97); } to { opacity: 1; transform: none; } }
+.ficha-cerrar { position: absolute; top: 10px; right: 10px; margin: 0; padding: 6px 12px; background: #d5e6fa; z-index: 1; }
+.ficha-cuerpo { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+.ficha-img { width: 100%; max-height: 65vh; object-fit: contain; background: white; border-radius: 12px; cursor: zoom-in; }
+.ficha-info h2 { margin: 4px 0; text-align: left; font-size: 26px; overflow-wrap: anywhere; }
+.ficha-info h3 { margin: 16px 0 6px; }
+.ficha-precio { font-size: 28px; font-weight: bold; margin: 6px 0 10px; }
+.ficha-desc { white-space: pre-line; line-height: 1.5; overflow-wrap: anywhere; margin: 0 0 16px; }
+.ficha-info > button { width: 100%; box-sizing: border-box; font-weight: bold; }
+.ficha-info .opciones { justify-content: flex-start; }
+@media (max-width: 700px) {
+    #ficha { padding: 14px; width: calc(100vw - 20px); }
+    .ficha-cuerpo { grid-template-columns: 1fr; gap: 14px; }
+    .ficha-img { max-height: 40vh; }
+    .ficha-info h2 { font-size: 21px; padding-right: 36px; }
+    .ficha-precio { font-size: 24px; }
+}
+@media (prefers-reduced-motion: reduce) { #ficha[open] { animation: none; } }
